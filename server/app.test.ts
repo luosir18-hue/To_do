@@ -94,5 +94,42 @@ test("聊天 API 只将有效的完整对话传给智能体，并返回其回复
 
   const invalid = await request("POST", "/api/chat", { messages: messages.slice(0, 2) });
   assert.equal(invalid.status, 400);
-  assert.deepEqual(conversations, [messages]);
+
+  const withTimestamp = [
+    { role: "user", content: "明天买牛奶", timestamp: "2026-11-26 20:30" },
+  ];
+  const validTimestamp = await request("POST", "/api/chat", { messages: withTimestamp });
+  assert.deepEqual(validTimestamp, { status: 200, body: { reply: "收到" } });
+  assert.deepEqual(conversations, [messages, withTimestamp]);
+});
+
+test("任务 API 支持截止日期、优先级、工作量与子任务管理", async (t) => {
+  const { request } = await startTestApp(t);
+  const created = await request("POST", "/api/tasks", {
+    title: "周末露营",
+    due_date: "2026-11-28",
+    priority: "high",
+    effort: "large",
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.due_date, "2026-11-28");
+  assert.equal(created.body.priority, "high");
+  assert.equal(created.body.effort, "large");
+
+  const subAdded = await request("POST", `/api/tasks/${created.body.id}/subtasks`, {
+    title: "订营地",
+  });
+  assert.equal(subAdded.status, 201);
+  assert.equal(subAdded.body.subtasks.length, 1);
+  const subId = subAdded.body.subtasks[0].id;
+
+  const subToggled = await request("PATCH", `/api/tasks/${created.body.id}/subtasks/${subId}`, {
+    done: true,
+  });
+  assert.equal(subToggled.status, 200);
+  assert.equal(subToggled.body.subtasks[0].done, true);
+
+  const subDeleted = await request("DELETE", `/api/tasks/${created.body.id}/subtasks/${subId}`);
+  assert.equal(subDeleted.status, 200);
+  assert.equal(subDeleted.body.subtasks.length, 0);
 });

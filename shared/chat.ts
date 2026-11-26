@@ -3,6 +3,7 @@ import { z } from "zod";
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().trim().min(1),
+  timestamp: z.string().optional(),
 });
 
 export type ChatMessage = z.infer<typeof messageSchema>;
